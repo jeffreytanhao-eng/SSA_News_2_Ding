@@ -1,0 +1,5 @@
+{
+  "name": "News2Ding",
+  "description": "Daily news automation and social media assistant. Scrapes news, generates insights with AI, and pushes to DingTalk.",
+  "requestFramePermissions": []
+}
