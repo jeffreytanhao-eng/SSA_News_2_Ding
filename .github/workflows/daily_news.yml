@@ -21,6 +21,10 @@ jobs:
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           KEYWORDS: ${{ secrets.KEYWORDS }}
           LLM_MODEL: ${{ secrets.LLM_MODEL || 'gemini-3-flash-preview' }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER || 'gemini' }}
+          DOUBAO_API_KEY: ${{ secrets.DOUBAO_API_KEY }}
+          DOUBAO_ENDPOINT: ${{ secrets.DOUBAO_ENDPOINT }}
+          DOUBAO_MODEL: ${{ secrets.DOUBAO_MODEL }}
         run: |
           # We can use a simple script to trigger the logic or run the server logic directly
           # For simplicity in this environment, we'll create a small runner script

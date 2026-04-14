@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import axios from "axios";
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -49,9 +50,7 @@ async function fetchNews(keyword: string) {
 }
 
 async function generateContent(newsList: any[]) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-  const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
-  
+  const provider = process.env.AI_PROVIDER || "gemini";
   const prompt = `
 作为一个资深自媒体主编，请对以下新闻进行点评，并写出一份吸引人的行业日报初稿。
 
@@ -66,14 +65,32 @@ ${newsList.map((n, i) => `${i + 1}. ${n.title} (来源: ${n.source})`).join("\n"
 `;
 
   try {
-    const result = await ai.models.generateContent({
-      model: modelName,
-      contents: [{ parts: [{ text: prompt }] }],
-    });
-    return result.text;
+    if (provider === "doubao" && process.env.DOUBAO_API_KEY) {
+      const openai = new OpenAI({
+        apiKey: process.env.DOUBAO_API_KEY,
+        baseURL: process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3",
+      });
+
+      const response = await openai.chat.completions.create({
+        model: process.env.DOUBAO_MODEL || "",
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      return response.choices[0].message.content;
+    } else {
+      // Fallback to Gemini
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+      const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
+      
+      const result = await ai.models.generateContent({
+        model: modelName,
+        contents: [{ parts: [{ text: prompt }] }],
+      });
+      return result.text;
+    }
   } catch (error) {
     console.error("Error generating content:", error);
-    return "AI 内容生成失败。";
+    return "AI 内容生成失败，请检查 API 配置。";
   }
 }
 
