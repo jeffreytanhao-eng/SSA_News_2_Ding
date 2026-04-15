@@ -16,13 +16,13 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const [config, setConfig] = useState<{ hasWebhook: boolean; keywords: string }>({
+  const [config, setConfig] = useState<{ hasWebhook: boolean; keywords: string; focusMedia?: string }>({
     hasWebhook: false,
     keywords: ""
   });
   const [newKeyword, setNewKeyword] = useState("");
   const [userContext, setUserContext] = useState("作为投资机构从业者，我需要结合关键词为机构做出每日分析");
-  const [focusMedia, setFocusMedia] = useState("");
+  const [focusMedia, setFocusMedia] = useState("SpaceNews, Sputnik News, Via Satellite, 卫星与网络, Space Daily");
   const [status, setStatus] = useState<"idle" | "running" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [lastRun, setLastRun] = useState<string | null>(null);
