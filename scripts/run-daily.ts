@@ -5,8 +5,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 2.3.0 - Debugging Sync Issue
-// This comment is to force a change and verify sync.
+// Version: 2.4.0 - Final Sync Check
+// Timestamp: 2026-04-15 16:45
 async function fetchNews(keyword: string) {
   const encodedKeyword = encodeURIComponent(keyword);
   const url = `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
@@ -135,8 +135,8 @@ async function sendToDingTalk(content: string) {
   const payload = {
     msgtype: "markdown",
     markdown: {
-      title: `📅 ${date} 行业动态速递 (v2.2-Latest)`,
-      text: `## 📅 ${date} 行业动态速递 (v2.2-Latest)\n\n${content}`
+      title: `📅 ${date} 行业动态速递 (v2.4.0-Final)`,
+      text: `## 📅 ${date} 行业动态速递 (v2.4.0-Final)\n\n${content}`
     }
   };
 
@@ -145,7 +145,8 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("RUNNING VERSION: v2.3.0-Debug");
+  console.log("CRITICAL DEBUG VERSION: v2.4.0-Final");
+  console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   console.log("Starting daily news task...");
   const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
@@ -163,6 +164,9 @@ async function run() {
   console.log(`Fetched ${uniqueNews.length} unique news items.`);
   
   const aiContent = await generateContent(uniqueNews);
+  console.log("--- AI RESPONSE START ---");
+  console.log(aiContent);
+  console.log("--- AI RESPONSE END ---");
   await sendToDingTalk(aiContent);
   console.log("Task completed successfully.");
 }
