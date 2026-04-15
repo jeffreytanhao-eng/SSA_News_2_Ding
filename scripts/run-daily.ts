@@ -134,8 +134,8 @@ async function sendToDingTalk(content: string) {
   const payload = {
     msgtype: "markdown",
     markdown: {
-      title: `📅 ${date} 行业动态速递`,
-      text: `## 📅 ${date} 行业动态速递\n\n${content}`
+      title: `📅 ${date} 行业动态速递 (v2.2-Latest)`,
+      text: `## 📅 ${date} 行业动态速递 (v2.2-Latest)\n\n${content}`
     }
   };
 
