@@ -25,6 +25,8 @@ jobs:
           DOUBAO_API_KEY: ${{ secrets.DOUBAO_API_KEY }}
           DOUBAO_ENDPOINT: ${{ secrets.DOUBAO_ENDPOINT }}
           DOUBAO_MODEL: ${{ secrets.DOUBAO_MODEL }}
+          USER_CONTEXT: ${{ secrets.USER_CONTEXT }}
+          FOCUS_MEDIA: ${{ secrets.FOCUS_MEDIA }}
         run: |
           # We can use a simple script to trigger the logic or run the server logic directly
           # For simplicity in this environment, we'll create a small runner script

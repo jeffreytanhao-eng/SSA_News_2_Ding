@@ -5,7 +5,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 2.0.0 - High Quality Investment Analysis Format
+// Version: 2.3.0 - Debugging Sync Issue
+// This comment is to force a change and verify sync.
 async function fetchNews(keyword: string) {
   const encodedKeyword = encodeURIComponent(keyword);
   const url = `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
@@ -143,6 +144,9 @@ async function sendToDingTalk(content: string) {
 }
 
 async function run() {
+  console.log("=========================================");
+  console.log("RUNNING VERSION: v2.3.0-Debug");
+  console.log("=========================================");
   console.log("Starting daily news task...");
   const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
   const keywords = keywordsStr.split(",").map(k => k.trim()).filter(k => k);
