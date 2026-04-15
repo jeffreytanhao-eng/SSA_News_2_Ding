@@ -132,8 +132,8 @@ async function sendToDingTalk(content: string) {
   const payload = {
     msgtype: "markdown",
     markdown: {
-      title: `📅 ${date} 行业动态速递 (FORCED-v2.5)`,
-      text: `## 📅 ${date} 行业动态速递 (FORCED-v2.5)\n\n${content}`
+      title: `📅 ${date} 行业动态速递`,
+      text: `## 📅 ${date} 行业动态速递\n\n${content}`
     }
   };
 
@@ -142,7 +142,7 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("FORCED SYNC VERSION: v2.5.0");
+  console.log("PRODUCTION VERSION: v3.0.0");
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   

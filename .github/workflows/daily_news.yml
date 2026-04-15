@@ -28,4 +28,4 @@ jobs:
           USER_CONTEXT: ${{ secrets.USER_CONTEXT }}
           FOCUS_MEDIA: ${{ secrets.FOCUS_MEDIA }}
         run: |
-          npx tsx scripts/debug-push.ts
+          npx tsx scripts/run-daily.ts

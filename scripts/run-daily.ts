@@ -5,14 +5,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 2.4.0 - Final Sync Check
-// Timestamp: 2026-04-15 16:45
+// Version: 3.0.0 - Production Ready
 async function fetchNews(keyword: string) {
   const encodedKeyword = encodeURIComponent(keyword);
   const url = `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
   
   try {
-    const response = await axios.get(url, { timeout: 10000 });
+    const response = await axios.get(url, { timeout: 15000 });
     const xml = response.data;
     const items: any[] = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
@@ -25,7 +24,6 @@ async function fetchNews(keyword: string) {
       const pubDateStr = content.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
       const source = content.match(/<source[\s\S]*?>([\s\S]*?)<\/source>/)?.[1] || "";
       
-      // Date filtering: Only keep news from the last 50 hours
       const pubDate = new Date(pubDateStr);
       const now = new Date();
       const isRecent = !isNaN(pubDate.getTime()) && (now.getTime() - pubDate.getTime()) < 50 * 60 * 60 * 1000;
@@ -94,11 +92,12 @@ ${newsList.map((n, i) => `[ID: ${i}] 标题: ${n.title} | 来源: ${n.source} | 
 `;
 
   console.log("Using Provider:", provider);
-  console.log("Keywords used for filtering:", keywords.join(", "));
+  console.log("--- DEBUG PROMPT START ---");
+  console.log(prompt.substring(0, 500) + "...");
+  console.log("--- DEBUG PROMPT END ---");
 
   try {
     if (provider === "doubao" && process.env.DOUBAO_API_KEY) {
-      console.log("Generating content with Doubao...");
       const openai = new OpenAI({
         apiKey: process.env.DOUBAO_API_KEY.trim(),
         baseURL: process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3",
@@ -111,10 +110,8 @@ ${newsList.map((n, i) => `[ID: ${i}] 标题: ${n.title} | 来源: ${n.source} | 
 
       return response.choices[0].message.content;
     } else {
-      console.log("Generating content with Gemini...");
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
       const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
-      
       const result = await ai.models.generateContent({
         model: modelName,
         contents: [{ parts: [{ text: prompt }] }],
@@ -135,8 +132,8 @@ async function sendToDingTalk(content: string) {
   const payload = {
     msgtype: "markdown",
     markdown: {
-      title: `📅 ${date} 行业动态速递 (v2.4.0-Final)`,
-      text: `## 📅 ${date} 行业动态速递 (v2.4.0-Final)\n\n${content}`
+      title: `📅 ${date} 行业动态速递`,
+      text: `## 📅 ${date} 行业动态速递\n\n${content}`
     }
   };
 
@@ -145,10 +142,10 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("CRITICAL DEBUG VERSION: v2.4.0-Final");
+  console.log("PRODUCTION VERSION: v3.0.0");
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
-  console.log("Starting daily news task...");
+  
   const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
   const keywords = keywordsStr.split(",").map(k => k.trim()).filter(k => k);
   
@@ -164,9 +161,6 @@ async function run() {
   console.log(`Fetched ${uniqueNews.length} unique news items.`);
   
   const aiContent = await generateContent(uniqueNews);
-  console.log("--- AI RESPONSE START ---");
-  console.log(aiContent);
-  console.log("--- AI RESPONSE END ---");
   await sendToDingTalk(aiContent);
   console.log("Task completed successfully.");
 }
