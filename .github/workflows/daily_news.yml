@@ -28,6 +28,4 @@ jobs:
           USER_CONTEXT: ${{ secrets.USER_CONTEXT }}
           FOCUS_MEDIA: ${{ secrets.FOCUS_MEDIA }}
         run: |
-          # We can use a simple script to trigger the logic or run the server logic directly
-          # For simplicity in this environment, we'll create a small runner script
-          npx tsx scripts/run-daily.ts
+          npx tsx scripts/debug-push.ts
