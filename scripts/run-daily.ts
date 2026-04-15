@@ -34,7 +34,7 @@ async function generateContent(newsList: any[]) {
   const provider = process.env.AI_PROVIDER || "gemini";
   const userContext = process.env.USER_CONTEXT || "作为投资机构从业者，我需要结合关键词为机构做出每日分析";
   const focusMedia = process.env.FOCUS_MEDIA || "暂无特定关注媒体";
-  const keywords = (process.env.KEYWORDS || "").split(",").map(k => k.trim()).filter(k => k);
+  const keywords = (process.env.KEYWORDS || "AI技术, 自动驾驶, 半导体").split(",").map(k => k.trim()).filter(k => k);
   
   const prompt = `
 作为一个资深自媒体主编，请从以下【新闻列表】中筛选出与【搜索关键词】高度相关的资讯。
