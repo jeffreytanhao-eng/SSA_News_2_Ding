@@ -9,7 +9,10 @@ import {
   AlertCircle,
   ExternalLink,
   Calendar,
-  Sparkles
+  Sparkles,
+  Plus,
+  X,
+  Tag
 } from "lucide-react";
 
 export default function App() {
@@ -17,6 +20,9 @@ export default function App() {
     hasWebhook: false,
     keywords: ""
   });
+  const [newKeyword, setNewKeyword] = useState("");
+  const [userContext, setUserContext] = useState("作为投资机构从业者，我需要结合关键词为机构做出每日分析");
+  const [focusMedia, setFocusMedia] = useState("");
   const [status, setStatus] = useState<"idle" | "running" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [lastRun, setLastRun] = useState<string | null>(null);
@@ -35,19 +41,56 @@ export default function App() {
     }
   };
 
+  const addKeyword = async () => {
+    if (!newKeyword.trim()) return;
+    const currentList = config.keywords.split(",").map(k => k.trim()).filter(k => k);
+    if (currentList.includes(newKeyword.trim())) {
+      setNewKeyword("");
+      return;
+    }
+    const newList = [...currentList, newKeyword.trim()];
+    await updateKeywords(newList);
+    setNewKeyword("");
+  };
+
+  const removeKeyword = async (keywordToRemove: string) => {
+    const newList = config.keywords.split(",").map(k => k.trim()).filter(k => k !== keywordToRemove);
+    await updateKeywords(newList);
+  };
+
+  const updateKeywords = async (newList: string[]) => {
+    try {
+      const res = await fetch("/api/config/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywords: newList })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConfig(prev => ({ ...prev, keywords: newList.join(", ") }));
+      }
+    } catch (err) {
+      console.error("Failed to update keywords", err);
+    }
+  };
+
   const runTask = async () => {
     setStatus("running");
-    setMessage("正在抓取新闻并生成 AI 简报...");
+    setMessage("正在抓取新闻并创作自媒体文案...");
     try {
-      const res = await fetch("/api/run-task", { method: "POST" });
+      const res = await fetch("/api/run-task", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: userContext, focusMedia: focusMedia })
+      });
       const data = await res.json();
       if (data.success) {
         setStatus("success");
-        setMessage(`成功推送！共处理了 ${data.newsCount} 条新闻。`);
+        setMessage(`文案创作成功并已推送！`);
         setLastRun(new Date().toLocaleTimeString());
       } else {
         setStatus("error");
-        setMessage("推送失败，请检查 Webhook 配置。");
+        setMessage(data.message || "推送失败，请检查 Webhook 配置。");
       }
     } catch (err) {
       setStatus("error");
@@ -66,7 +109,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">News2Ding</h1>
-              <p className="text-xs text-[#1a1a1a]/50 font-medium uppercase tracking-widest">Daily News Assistant</p>
+              <p className="text-xs text-[#1a1a1a]/50 font-medium uppercase tracking-widest">AI Media Creator</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -93,11 +136,35 @@ export default function App() {
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles size={18} className="text-[#5A5A40]" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]">AI Powered Automation</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]">AI Creative Studio</span>
                 </div>
-                <h2 className="text-3xl font-serif font-medium mb-4">开启今日新闻简报</h2>
-                <p className="text-[#1a1a1a]/60 mb-8 leading-relaxed">
-                  点击下方按钮，系统将自动抓取过去 24 小时内关于 <span className="font-bold text-[#1a1a1a]">“{config.keywords || "加载中..."}”</span> 的最新动态，并通过 AI 生成深度总结与创作建议，最后推送到您的钉钉群。
+                <h2 className="text-3xl font-serif font-medium mb-4">定制化自媒体创作</h2>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-[#1a1a1a]/60 mb-2 uppercase tracking-wider">
+                    创作背景 / 基本信息
+                  </label>
+                  <textarea
+                    value={userContext}
+                    onChange={(e) => setUserContext(e.target.value)}
+                    placeholder="作为投资机构从业者，我需要结合关键词为机构做出每日分析"
+                    className="w-full h-24 p-4 bg-[#f5f5f0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] transition-all resize-none text-sm leading-relaxed mb-4"
+                  />
+
+                  <label className="block text-sm font-bold text-[#1a1a1a]/60 mb-2 uppercase tracking-wider">
+                    重点关注媒体 / 公众号
+                  </label>
+                  <input
+                    type="text"
+                    value={focusMedia}
+                    onChange={(e) => setFocusMedia(e.target.value)}
+                    placeholder="例如：华尔街见闻, 36氪, 虎嗅..."
+                    className="w-full p-4 bg-[#f5f5f0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40] transition-all text-sm"
+                  />
+                </div>
+
+                <p className="text-sm text-[#1a1a1a]/60 mb-8 leading-relaxed italic">
+                  系统将结合上述信息与 <span className="font-bold text-[#1a1a1a]">“{config.keywords || "加载中..."}”</span> 的最新动态进行创作。
                 </p>
 
                 <button
@@ -114,12 +181,12 @@ export default function App() {
                   {status === "running" ? (
                     <>
                       <RefreshCw size={20} className="animate-spin" />
-                      正在处理中...
+                      正在深度创作中...
                     </>
                   ) : (
                     <>
                       <Send size={20} />
-                      立即执行推送任务
+                      生成并推送文案
                     </>
                   )}
                 </button>
@@ -167,21 +234,52 @@ export default function App() {
           <div className="space-y-6">
             <div className="bg-white rounded-[24px] p-6 shadow-sm border border-[#1a1a1a]/5">
               <div className="flex items-center gap-2 mb-4">
-                <Settings size={18} className="text-[#1a1a1a]/40" />
-                <h3 className="text-sm font-bold uppercase tracking-widest text-[#1a1a1a]/40">当前配置</h3>
+                <Tag size={18} className="text-[#1a1a1a]/40" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-[#1a1a1a]/40">关键词管理</h3>
               </div>
+              
               <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-[#1a1a1a]/50 block mb-1">关注关键字</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(config.keywords || "无").split(",").map((k, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-[#f5f5f0] rounded-lg text-sm font-medium">
-                        {k.trim()}
-                      </span>
-                    ))}
-                  </div>
+                {/* Add Keyword Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newKeyword}
+                    onChange={(e) => setNewKeyword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addKeyword()}
+                    placeholder="添加关键词..."
+                    className="flex-1 px-3 py-2 bg-[#f5f5f0] rounded-xl text-sm focus:ring-2 focus:ring-[#5A5A40] outline-none transition-all"
+                  />
+                  <button
+                    onClick={addKeyword}
+                    className="p-2 bg-[#1a1a1a] text-white rounded-xl hover:bg-[#1a1a1a]/80 transition-colors"
+                  >
+                    <Plus size={18} />
+                  </button>
                 </div>
-                <div>
+
+                {/* Keywords List */}
+                <div className="flex flex-wrap gap-2">
+                  {(config.keywords || "").split(",").map((k, i) => {
+                    const trimmed = k.trim();
+                    if (!trimmed) return null;
+                    return (
+                      <span 
+                        key={i} 
+                        className="group flex items-center gap-1.5 px-3 py-1.5 bg-[#f5f5f0] rounded-full text-sm font-medium hover:bg-[#1a1a1a]/5 transition-colors"
+                      >
+                        {trimmed}
+                        <button 
+                          onClick={() => removeKeyword(trimmed)}
+                          className="text-[#1a1a1a]/30 hover:text-red-500 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-4 border-t border-[#1a1a1a]/5">
                   <label className="text-xs font-medium text-[#1a1a1a]/50 block mb-1">推送通道</label>
                   <div className="flex items-center gap-2 text-sm">
                     <div className={`w-2 h-2 rounded-full ${config.hasWebhook ? "bg-green-500" : "bg-red-500"}`} />

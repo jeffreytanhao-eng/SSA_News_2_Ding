@@ -49,30 +49,59 @@ async function fetchNews(keyword: string) {
   }
 }
 
-async function generateContent(newsList: any[]) {
+async function generateContent(newsList: any[], userContext: string = "", focusMedia: string = "", keywords: string[] = []) {
   const provider = process.env.AI_PROVIDER || "gemini";
   const prompt = `
-作为一个资深自媒体主编，请对以下新闻进行点评，并写出一份吸引人的行业日报初稿。
+作为一个资深自媒体主编，请从以下【新闻列表】中筛选出与【搜索关键词】高度相关的资讯。
 
-新闻列表：
-${newsList.map((n, i) => `${i + 1}. ${n.title} (来源: ${n.source})`).join("\n")}
+【搜索关键词】：
+${keywords.join(", ")}
 
-要求：
-1. 深度总结：用一句话提炼每条新闻的核心价值。
-2. 创作建议：针对自媒体（如公众号、小红书）给出 3 个爆款切入点。
-3. 初稿生成：整合成一篇约 300 字的“行业日报”风格初稿。
-4. 格式：使用 Markdown。
+【创作背景/基本信息】：
+${userContext || "作为投资机构从业者，我需要结合关键词为机构做出每日分析"}
+
+【重点关注媒体/公众号】：
+${focusMedia || "暂无特定关注媒体"}
+
+【新闻列表】：
+${newsList.map((n, i) => `[ID: ${i}] 标题: ${n.title} | 来源: ${n.source} | 时间: ${n.pubDate} | 链接: ${n.link}`).join("\n")}
+
+【筛选准则（重要）】：
+1. **语义相关性校验**：确保新闻内容与【搜索关键词】的核心语义相关。请注意包含近义词、专业术语或科学背景下的关联（例如：“太空碎片”、“星际物体碎片”与“太空垃圾”是高度相关的）。但仍需剔除完全无关的领域（如：地面生活垃圾处理）。
+2. **质量优先**：最多不超过 5 条。如果资讯相关度不高，推送条数可以少于 5 条。
+3. **补充说明**：如果最终筛选出的资讯不足 5 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
+
+【输出格式要求】：
+请针对筛选出的新闻，严格按照以下格式逐一输出（使用 Markdown）：
+
+### [序号] [简要题目]
+- **概要**：[简要题目] | [来源] | [发布时间]
+- **原始链接**：[链接地址]
+- **简要分析与建议**：
+  - **主要内容**：[简述文章主要内容]
+  - **需求契合点**：[解释其与关键词的相关性及对投资机构的价值]
+  - **创作思路**：[建议的文案主题与大概思路，字数控制在 200 字以内]
+
+---
+注意：如果没有任何高度相关的资讯，请仅回复：“今日未发现与关键词高度相关的优质资讯。”
 `;
 
   try {
     if (provider === "doubao" && process.env.DOUBAO_API_KEY) {
+      const endpoint = (process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3").trim();
+      
+      // Basic URL validation to prevent TypeError
+      if (!endpoint.startsWith("http")) {
+        throw new Error(`无效的 Endpoint URL: ${endpoint}`);
+      }
+
       const openai = new OpenAI({
-        apiKey: process.env.DOUBAO_API_KEY,
-        baseURL: process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3",
+        apiKey: process.env.DOUBAO_API_KEY.trim(),
+        baseURL: endpoint,
       });
 
       const response = await openai.chat.completions.create({
-        model: process.env.DOUBAO_MODEL || "",
+        model: (process.env.DOUBAO_MODEL || "").trim(),
         messages: [{ role: "user", content: prompt }],
       });
 
@@ -88,9 +117,10 @@ ${newsList.map((n, i) => `${i + 1}. ${n.title} (来源: ${n.source})`).join("\n"
       });
       return result.text;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating content:", error);
-    return "AI 内容生成失败，请检查 API 配置。";
+    const errorMsg = error.response?.data?.error?.message || error.message || "未知错误";
+    return `AI 内容生成失败: ${errorMsg}。请检查 API 配置（Provider: ${provider}, Model: ${process.env.DOUBAO_MODEL || '未设置'}）`;
   }
 }
 
@@ -98,7 +128,7 @@ async function sendToDingTalk(content: string) {
   const webhook = process.env.DINGTALK_WEBHOOK;
   if (!webhook) {
     console.error("DINGTALK_WEBHOOK not configured");
-    return { success: false, message: "Webhook not configured" };
+    return { success: false, message: "未配置 DINGTALK_WEBHOOK 环境变量" };
   }
 
   const date = new Date().toLocaleDateString('zh-CN');
@@ -111,24 +141,46 @@ async function sendToDingTalk(content: string) {
   };
 
   try {
-    await axios.post(webhook, payload);
+    const response = await axios.post(webhook, payload);
+    // DingTalk returns 200 even if it fails, need to check errcode
+    if (response.data && response.data.errcode !== 0) {
+      console.error("DingTalk API Error:", response.data);
+      return { 
+        success: false, 
+        message: `钉钉推送失败: [${response.data.errcode}] ${response.data.errmsg}` 
+      };
+    }
     return { success: true };
-  } catch (error) {
-    console.error("Error sending to DingTalk:", error);
-    return { success: false, error };
+  } catch (error: any) {
+    console.error("Network Error sending to DingTalk:", error);
+    return { success: false, message: `网络错误: ${error.message}` };
   }
 }
+
+// In-memory storage for keywords, initialized from env
+let currentKeywords = (process.env.KEYWORDS || "AI技术, 自动驾驶, 半导体").split(",").map(k => k.trim()).filter(k => k);
 
 // API Routes
 app.get("/api/config", (req, res) => {
   res.json({
     hasWebhook: !!process.env.DINGTALK_WEBHOOK,
-    keywords: process.env.KEYWORDS || ""
+    keywords: currentKeywords.join(", ")
   });
 });
 
+app.post("/api/config/keywords", (req, res) => {
+  const { keywords } = req.body;
+  if (Array.isArray(keywords)) {
+    currentKeywords = keywords.map(k => k.trim()).filter(k => k);
+    res.json({ success: true, keywords: currentKeywords });
+  } else {
+    res.status(400).json({ success: false, message: "Invalid keywords format" });
+  }
+});
+
 app.post("/api/run-task", async (req, res) => {
-  const keywords = (process.env.KEYWORDS || "AI技术").split(",").map(k => k.trim());
+  const { context, focusMedia } = req.body;
+  const keywords = currentKeywords;
   let allNews: any[] = [];
   
   for (const keyword of keywords) {
@@ -139,10 +191,10 @@ app.post("/api/run-task", async (req, res) => {
   // Deduplicate by title
   const uniqueNews = Array.from(new Map(allNews.map(item => [item.title, item])).values());
   
-  const aiContent = await generateContent(uniqueNews);
+  const aiContent = await generateContent(uniqueNews, context, focusMedia, keywords);
   const result = await sendToDingTalk(aiContent);
   
-  res.json({ success: result.success, newsCount: uniqueNews.length });
+  res.json({ success: result.success, newsCount: uniqueNews.length, message: result.message });
 });
 
 async function startServer() {
