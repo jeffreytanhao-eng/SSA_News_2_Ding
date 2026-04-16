@@ -2,7 +2,7 @@ name: Daily News Automation
 
 on:
   schedule:
-    - cron: '30 1 * * *' # UTC 01:30 is Beijing 09:30
+    - cron: '31 1 * * *' # UTC 01:31 is Beijing 09:31
   workflow_dispatch: # Allow manual trigger
 
 jobs:
