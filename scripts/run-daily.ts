@@ -5,10 +5,12 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 3.0.0 - Production Ready
-async function fetchNews(keyword: string) {
+// Version: 3.1.0 - Multi-language Support (CN/EN)
+async function fetchNews(keyword: string, lang: 'zh' | 'en' = 'zh') {
   const encodedKeyword = encodeURIComponent(keyword);
-  const url = `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+  const url = lang === 'zh' 
+    ? `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`
+    : `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=en-US&gl=US&ceid=US:en`;
   
   try {
     const response = await axios.get(url, { timeout: 15000 });
@@ -29,12 +31,12 @@ async function fetchNews(keyword: string) {
       const isRecent = !isNaN(pubDate.getTime()) && (now.getTime() - pubDate.getTime()) < 50 * 60 * 60 * 1000;
       
       if (isRecent && items.length < 15) {
-        items.push({ title, link, pubDate: pubDateStr, source });
+        items.push({ title, link, pubDate: pubDateStr, source, lang });
       }
     }
     return items;
   } catch (error) {
-    console.error(`Error fetching news for ${keyword}:`, error);
+    console.error(`Error fetching ${lang} news for ${keyword}:`, error);
     return [];
   }
 }
@@ -58,7 +60,7 @@ async function generateContent(newsList: any[]) {
 【重点关注媒体】：${focusMedia}
 
 【新闻列表】：
-${newsList.map((n, i) => `[ID: ${i}] 标题: ${n.title} | 来源: ${n.source} | 发布时间: ${n.pubDate} | 链接: ${n.link}`).join("\n")}
+${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文'}] 标题: ${n.title} | 来源: ${n.source} | 发布时间: ${n.pubDate} | 链接: ${n.link}`).join("\n")}
 
 【筛选准则（重要）】：
 1. **时效性校验（最高优先级）**：今天是 ${currentTimeStr}。
@@ -72,20 +74,23 @@ ${newsList.map((n, i) => `[ID: ${i}] 标题: ${n.title} | 来源: ${n.source} | 
 3. **来源质量评估与交叉验证**：
    - **降级处理**：对于知名度低、经常重发旧闻或内容质量差的网站（如 ekhbary.com, mixvale.com 等），应降低其入选权重。
    - **孤证识别**：如果某条重要资讯仅由上述低质网站报道，且在【新闻列表】中找不到其他主流媒体（如 SpaceNews, Sputnik, Via Satellite, 卫星与网络, 新华网等）的交叉验证，必须在输出中添加可靠性提示。
-4. **质量优先**：最多不超过 8 条。如果资讯相关度不高，推送条数可以少于 8 条。
-5. **补充说明**：如果最终筛选出的资讯不足 8 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
+4. **多语言处理**：
+   - 对于标记为【英文】的资讯，请将其标题、概要、分析等所有输出内容**翻译为高质量中文**。
+   - 在输出的“概要”栏目中，必须明确标注“原文语言：英文”。
+5. **质量优先**：最多不超过 8 条。如果资讯相关度不高，推送条数可以少于 8 条。
+6. **补充说明**：如果最终筛选出的资讯不足 8 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
 
 【输出格式要求】：
 请针对筛选出的新闻，严格按照以下格式逐一输出（使用 Markdown）：
 
-### [序号] [简要题目]
-- **概要**：[简要题目] | [来源] | [发布时间]
+### [序号] [简要题目（中文）]
+- **概要**：[简要题目（中文）] | [来源] | [发布时间] | [原文语言：中文/英文]
 - **原始链接**：[链接地址]
 - **可靠性提示**：[仅在来源可疑或为孤证时显示：⚠️ 来源可靠性待核实（原因：xxx）]
 - **简要分析与建议**：
-  - **主要内容**：[简述文章主要内容]
-  - **需求契合点**：[解释其与关键词的相关性及对投资机构的价值]
-  - **创作思路**：[建议的文案主题与大概思路，字数控制在 200 字以内]
+  - **主要内容**：[简述文章主要内容（中文）]
+  - **需求契合点**：[解释其与关键词的相关性及对投资机构的价值（中文）]
+  - **创作思路**：[建议的文案主题与大概思路，字数控制在 200 字以内（中文）]
 
 ---
 注意：如果没有任何高度相关的资讯，请仅回复：“今日未发现与关键词高度相关的优质资讯。”
@@ -142,23 +147,38 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("PRODUCTION VERSION: v3.0.0");
+  console.log("PRODUCTION VERSION: v3.1.0 (Multi-lang)");
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   
   const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
   const keywords = keywordsStr.split(",").map(k => k.trim()).filter(k => k);
   
+  // Mapping of Chinese keywords to English for broader search
+  const keywordMap: Record<string, string> = {
+    "太空态势感知": "Space Situational Awareness",
+    "太空碎片": "Space Debris",
+    "太空垃圾": "Space Junk",
+    "卫星碰撞预警": "Satellite Collision Warning",
+    "太空飞行安全": "Space Flight Safety"
+  };
+
   console.log("Target Keywords:", keywords);
   let allNews: any[] = [];
   
   for (const keyword of keywords) {
-    const news = await fetchNews(keyword);
-    allNews = [...allNews, ...news];
+    // Fetch Chinese news
+    const zhNews = await fetchNews(keyword, 'zh');
+    allNews = [...allNews, ...zhNews];
+
+    // Fetch English news using translated keyword if available
+    const enKeyword = keywordMap[keyword] || keyword;
+    const enNews = await fetchNews(enKeyword, 'en');
+    allNews = [...allNews, ...enNews];
   }
 
   const uniqueNews = Array.from(new Map(allNews.map(item => [item.title, item])).values());
-  console.log(`Fetched ${uniqueNews.length} unique news items.`);
+  console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN).`);
   
   const aiContent = await generateContent(uniqueNews);
   await sendToDingTalk(aiContent);
