@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 3.1.0 - Multi-language Support (CN/EN)
+// Version: 3.2.0 - Mobile Optimized (Concise Cards)
 async function fetchNews(keyword: string, lang: 'zh' | 'en' = 'zh') {
   const encodedKeyword = encodeURIComponent(keyword);
   const url = lang === 'zh' 
@@ -80,20 +80,18 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
 5. **质量优先**：最多不超过 8 条。如果资讯相关度不高，推送条数可以少于 8 条。
 6. **补充说明**：如果最终筛选出的资讯不足 8 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
 
-【输出格式要求】：
-请针对筛选出的新闻，严格按照以下格式逐一输出（使用 Markdown）：
+【输出格式要求（手机适配版）】：
+请针对筛选出的新闻，严格按照以下手机优先的格式输出，追求极致简洁（使用 Markdown）：
 
-### [序号] [简要题目（中文）]
-- **概要**：[简要题目（中文）] | [来源] | [发布时间] | [原文语言：中文/英文]
-- **原始链接**：[链接地址]
-- **可靠性提示**：[仅在来源可疑或为孤证时显示：⚠️ 来源可靠性待核实（原因：xxx）]
-- **简要分析与建议**：
-  - **主要内容**：[简述文章主要内容（中文）]
-  - **需求契合点**：[解释其与关键词的相关性及对投资机构的价值（中文）]
-  - **创作思路**：[建议的文案主题与大概思路，字数控制在 200 字以内（中文）]
+### 📍 [序号] [中文简报题目]
+**来源**：[来源] | [发布时间] | [原文语言]
+**直达**：[👉 点击查看文章详情]([链接地址])
+> **核心摘要**：[极简总结内容，控制在 100 字以内]
+> **价值/思路**：[简述对机构价值及创作建议，控制在 100 字以内]
+[仅在来源可疑时显示：⚠️ **可靠性提醒**：xxx]
 
 ---
-注意：如果没有任何高度相关的资讯，请仅回复：“今日未发现与关键词高度相关的优质资讯。”
+注意：每条资讯后必须紧跟分割线 `---`。如果没有任何资讯，请仅回复：“今日未发现优质资讯。”
 `;
 
   console.log("Using Provider:", provider);
@@ -147,7 +145,7 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("PRODUCTION VERSION: v3.1.0 (Multi-lang)");
+  console.log("PRODUCTION VERSION: v3.2.0 (Mobile Opt)");
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   
