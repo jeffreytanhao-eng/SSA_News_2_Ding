@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Version: 3.4.0 - Refined Cards (Card Style + Bullet Alignment + Deep Ideas)
+// Version: 3.5.0 - Perfect Alignment (Bullet Style + Length Balance)
 async function fetchNews(keyword: string, lang: 'zh' | 'en' = 'zh') {
   const encodedKeyword = encodeURIComponent(keyword);
   const url = lang === 'zh' 
@@ -80,14 +80,14 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
 5. **质量优先**：最多不超过 8 条。如果资讯相关度不高，推送条数可以少于 8 条。
 6. **补充说明**：如果最终筛选出的资讯不足 8 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
 
-【输出格式要求（精装卡片版）】：
-请针对筛选出的新闻，严格按照以下“卡片式”列表格式输出（使用 Markdown）：
+【输出格式要求（全对齐版）】：
+请针对筛选出的新闻，严格按照以下“全对齐”列表格式输出（使用 Markdown）：
 
 ### 📍 [序号] [中文简报题目]
 - **来源**：[来源] | [发布时间] | [原文语言]
 - **直达**：[👉 点击查看文章详情]([链接地址])
-> **核心摘要**：[分段简述文章核心内容，字数控制在 150 字以内，保持专业度]
-> **创作思路**：[重点扩充：深入分析该资讯对投资机构的参考价值、可能的行业影响，并给出具体且详细的创作建议或二级市场导向分析。字数要求 200-300 字]
+- **核心摘要**：[简明扼要地总结文章核心内容，字数控制在 150 字以内]
+- **创作思路**：[简述对投资机构的参考价值及创作建议，字数要求与“核心摘要”保持相近，控制在 150 字左右]
 [仅在来源可疑时显示：⚠️ **可靠性提醒**：xxx]
 
 ---
@@ -145,7 +145,7 @@ async function sendToDingTalk(content: string) {
 
 async function run() {
   console.log("=========================================");
-  console.log("PRODUCTION VERSION: v3.4.0 (Refined Cards)");
+  console.log("PRODUCTION VERSION: v3.5.0 (Aligned)");
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   
