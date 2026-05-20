@@ -45,7 +45,7 @@ async function generateContent(newsList: any[]) {
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
   const userContext = process.env.USER_CONTEXT || "作为投资机构从业者，我需要结合关键词为机构做出每日分析";
   const focusMedia = process.env.FOCUS_MEDIA || "SpaceNews, Sputnik News, Via Satellite, 卫星与网络, Space Daily";
-  const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
+  const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全，太空军";
   const keywords = keywordsStr.split(",").map(k => k.trim()).filter(k => k);
   
   const now = new Date();
@@ -77,8 +77,8 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
 4. **多语言处理**：
    - 对于标记为【英文】的资讯，请将其标题、概要、分析等所有输出内容**翻译为高质量中文**。
    - 在输出的“概要”栏目中，必须明确标注“原文语言：英文”。
-5. **质量优先**：最多不超过 8 条。如果资讯相关度不高，推送条数可以少于 8 条。
-6. **补充说明**：如果最终筛选出的资讯不足 8 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
+5. **质量优先**：最多不超过 12 条。如果资讯相关度不高，推送条数可以少于 12 条。
+6. **补充说明**：如果最终筛选出的资讯不足 12 条，请在文末增加一行描述：“注：今日未发现更多符合关键词高度相关的优质资讯。”
 
 【输出格式要求（全对齐版）】：
 请针对筛选出的新闻，严格按照以下“全对齐”列表格式输出（使用 Markdown）：
@@ -149,7 +149,7 @@ async function run() {
   console.log("EXECUTION TIME:", new Date().toISOString());
   console.log("=========================================");
   
-  const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全";
+  const keywordsStr = process.env.KEYWORDS || "太空态势感知, 太空碎片, 太空垃圾, 卫星碰撞预警, 太空飞行安全, 太空军";
   const keywords = keywordsStr.split(",").map(k => k.trim()).filter(k => k);
   
   // Mapping of Chinese keywords to English for broader search
@@ -158,7 +158,8 @@ async function run() {
     "太空碎片": "Space Debris",
     "太空垃圾": "Space Junk",
     "卫星碰撞预警": "Satellite Collision Warning",
-    "太空飞行安全": "Space Flight Safety"
+    "太空飞行安全": "Space Flight Safety",
+    "太空军": "Space Force"
   };
 
   console.log("Target Keywords:", keywords);
