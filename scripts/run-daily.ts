@@ -228,6 +228,8 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
       const response = await openai.chat.completions.create({
         model: (process.env.DOUBAO_MODEL || "").trim(),
         messages: [{ role: "user", content: prompt }],
+      }, {
+        timeout: 120000 // Explicitly set request timeout option to 120 seconds
       });
 
       return response.choices[0].message.content;
@@ -304,8 +306,8 @@ async function run() {
     return tB - tA;
   });
   
-  // Limit to top 50 items to keep prompt size optimized and prevent LLM timeouts
-  const topNews = uniqueNews.slice(0, 50);
+  // Limit to top 30 items to keep prompt size optimized and prevent LLM timeouts
+  const topNews = uniqueNews.slice(0, 30);
   console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN). Sending top ${topNews.length} sorted by date to AI.`);
   
   const aiContent = await generateContent(topNews);
