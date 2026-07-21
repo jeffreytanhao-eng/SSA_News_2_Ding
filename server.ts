@@ -176,8 +176,9 @@ async function generateContent(newsList: any[], userContext: string = "", focusM
   const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
   const now = new Date();
   const currentTimeStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-  
-  const prompt = `
+
+  function buildPrompt(list: any[], maxOutputItems: number) {
+    return `
 作为一个资深自媒体主编，请从以下【新闻列表】中筛选出与【搜索关键词】高度相关的资讯。
 
 【当前时间】：${currentTimeStr} (北京时间)
@@ -186,7 +187,7 @@ async function generateContent(newsList: any[], userContext: string = "", focusM
 【重点关注媒体】：${focusMedia || "SpaceNews, Sputnik News, Via Satellite, 卫星与网络, Space Daily"}
 
 【新闻列表】：
-${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文'}] 标题: ${n.title} | 来源: ${n.source} | 发布时间: ${n.pubDate} | 链接: ${n.link}`).join("\n")}
+${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文'}] 标题: ${n.title} | 来源: ${n.source} | 发布时间: ${n.pubDate} | 链接: ${n.link}`).join("\n")}
 
 【筛选准则（重要）】：
 1. **时效性校验（最高优先级）**：今天是 ${currentTimeStr}。
@@ -219,36 +220,123 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
 ---
 注意：每条资讯后必须紧跟分割线 \`---\`。如果没有任何资讯，请仅回复：“今日未发现优质资讯。”
 `;
+  }
+
+  console.log("Using Provider:", provider);
 
   try {
     if (provider === "doubao" && process.env.DOUBAO_API_KEY) {
-      const endpoint = (process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3").trim();
+      let customEndpoint = (process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3").trim();
       
-      if (!endpoint.startsWith("http")) {
-        throw new Error(`无效的 Endpoint URL: ${endpoint}`);
+      // Sanitizing base URL from any trailing chat/completions suffixes which are a very common user configuration error
+      const suffixes = ["/chat/completions", "/chat/completions/", "/chat", "/chat/", "/v3", "/v3/"];
+      for (const suffix of suffixes) {
+        if (customEndpoint.endsWith(suffix)) {
+          customEndpoint = customEndpoint.substring(0, customEndpoint.length - suffix.length);
+        }
+      }
+      if (customEndpoint.endsWith("/")) {
+        customEndpoint = customEndpoint.slice(0, -1);
+      }
+      // Re-append the clean /api/v3 version if we stripped it but it's Volcengine
+      if (customEndpoint.includes("volces.com") || customEndpoint.includes("volcengineapi.com")) {
+        if (!customEndpoint.endsWith("/api/v3")) {
+          customEndpoint = customEndpoint + "/api/v3";
+        }
       }
 
-      const openai = new OpenAI({
-        apiKey: process.env.DOUBAO_API_KEY.trim(),
-        baseURL: endpoint,
-        timeout: 120000
-      });
+      console.log(`[Doubao Config] Base Endpoint URL resolved to: ${customEndpoint}`);
 
-      const response = await openai.chat.completions.create({
-        model: (process.env.DOUBAO_MODEL || "").trim(),
-        messages: [{ role: "user", content: prompt }],
-      }, {
-        timeout: 120000 // Explicitly set request timeout option to 120 seconds
-      });
+      // We define potential endpoints to attempt sequentially for bypassing localized block/throttle issues in Github Actions or Cloud hosts (US/EU regions)
+      const endpointOptions = [
+        customEndpoint,
+        "https://ark.volcengineapi.com/api/v3", // Volcengine's Global accelerated endpoint (best for GitHub actions / Cloud hosts!)
+        "https://ark.cn-beijing.volces.com/api/v3" // Mainland domestic endpoint
+      ];
 
-      return response.choices[0].message.content || "今日未发现优质资讯。";
+      // Remove duplicate endpoints while preserving priority order
+      const uniqueEndpoints = Array.from(new Set(endpointOptions.filter(Boolean)));
+
+      let lastError: any = null;
+      
+      // We will try up to 3 attempts, scaling down prompt size and using alternative endpoints on failure/timeout
+      const attempts = [
+        { inputLimit: 20, maxOutput: 8, timeout: 60000 },
+        { inputLimit: 12, maxOutput: 5, timeout: 45000 },
+        { inputLimit: 8, maxOutput: 3, timeout: 30000 }
+      ];
+
+      for (let i = 0; i < attempts.length; i++) {
+        const { inputLimit, maxOutput, timeout } = attempts[i];
+        const slicedNews = newsList.slice(0, inputLimit);
+        const currentPrompt = buildPrompt(slicedNews, maxOutput);
+
+        // Within this attempt, try the endpoints starting from the prioritized list
+        for (const activeEndpoint of uniqueEndpoints) {
+          console.log(`[Doubao LLM] Attempt ${i + 1}/${attempts.length} using ${activeEndpoint} (Input Limit: ${slicedNews.length}, Max Output: ${maxOutput}, Timeout: ${timeout / 1000}s)`);
+          
+          try {
+            const openai = new OpenAI({
+              apiKey: process.env.DOUBAO_API_KEY.trim(),
+              baseURL: activeEndpoint,
+              timeout: timeout,
+              maxRetries: 0 // Prevent client internal retries from hanging, so we can pivot fast
+            });
+
+            const response = await openai.chat.completions.create({
+              model: (process.env.DOUBAO_MODEL || "").trim(),
+              messages: [{ role: "user", content: currentPrompt }],
+            }, {
+              timeout: timeout
+            });
+
+            const content = response.choices[0].message.content;
+            if (content && content.trim().length > 0) {
+              console.log(`[Doubao LLM] Successfully generated content on Attempt ${i + 1} with endpoint ${activeEndpoint}!`);
+              return content;
+            }
+          } catch (error: any) {
+            lastError = error;
+            console.warn(`[Doubao LLM] Attempt ${i + 1} with ${activeEndpoint} failed: ${error.message || error}.`);
+          }
+        }
+
+        if (i < attempts.length - 1) {
+          console.warn("Retrying next attempt with reduced prompt size and optimized limits to prevent timeout...");
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+      
+      // Fallback to Gemini if Doubao fails and Gemini Key is configured
+      if (process.env.GEMINI_API_KEY) {
+        console.warn("[Doubao LLM] All Doubao attempts failed. Attempting fallback to Gemini API...");
+        try {
+          const defaultPrompt = buildPrompt(newsList.slice(0, 15), 6);
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
+          const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
+          const result = await ai.models.generateContent({
+            model: modelName,
+            contents: [{ parts: [{ text: defaultPrompt }] }],
+          });
+          if (result.text) {
+            console.log("[Gemini Fallback] Successfully generated content using Gemini Fallback!");
+            return result.text;
+          }
+        } catch (geminiError: any) {
+          console.error("[Gemini Fallback] Gemini fallback also failed:", geminiError);
+        }
+      }
+
+      throw lastError || new Error("Failed to generate content after all attempts and endpoints");
     } else {
+      // Fallback to Gemini if configured, or if Doubao is disabled
+      const defaultPrompt = buildPrompt(newsList.slice(0, 20), 8);
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
       const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
-      
+      console.log(`[Gemini LLM] Attempting content generation with model: ${modelName}`);
       const result = await ai.models.generateContent({
         model: modelName,
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts: [{ text: defaultPrompt }] }],
       });
       return result.text || "今日未发现优质资讯。";
     }
