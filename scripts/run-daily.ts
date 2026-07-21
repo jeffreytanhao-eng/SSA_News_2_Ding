@@ -5,40 +5,158 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+function parseRssXml(xml: string, lang: 'zh' | 'en' = 'zh') {
+  const items: any[] = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  
+  while ((match = itemRegex.exec(xml)) !== null && items.length < 30) {
+    const content = match[1];
+    let title = content.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "";
+    title = title
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+      
+    let link = content.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "";
+    link = link.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+    
+    let pubDateStr = content.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
+    pubDateStr = pubDateStr.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+    
+    let source = content.match(/<source[\s\S]*?>([\s\S]*?)<\/source>/)?.[1] || "";
+    source = source.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();
+    
+    if (!source) {
+      const titleParts = title.split(/\s+[-|]\s+/);
+      if (titleParts.length > 1) {
+        source = titleParts.pop() || "";
+        title = titleParts.join(" - ");
+      } else {
+        try {
+          const urlObj = new URL(link);
+          source = urlObj.hostname.replace('www.', '');
+        } catch (e) {
+          source = "News Source";
+        }
+      }
+    }
+    
+    const pubDate = new Date(pubDateStr);
+    const now = new Date();
+    const isRecent = !isNaN(pubDate.getTime()) && (now.getTime() - pubDate.getTime()) < 50 * 60 * 60 * 1000;
+    
+    if (isRecent && items.length < 15) {
+      items.push({ title, link, pubDate: pubDateStr, timestamp: pubDate.getTime(), source, lang });
+    }
+  }
+  return items;
+}
+
 // Version: 3.5.0 - Perfect Alignment (Bullet Style + Length Balance)
 async function fetchNews(keyword: string, lang: 'zh' | 'en' = 'zh') {
   const encodedKeyword = encodeURIComponent(keyword);
-  const url = lang === 'zh' 
+  const googleUrl = lang === 'zh' 
     ? `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`
     : `https://news.google.com/rss/search?q=${encodedKeyword}+when:2d&hl=en-US&gl=US&ceid=US:en`;
   
+  // 1. Try Google News RSS directly
   try {
-    const response = await axios.get(url, { timeout: 15000 });
+    const response = await axios.get(googleUrl, { 
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': lang === 'zh' ? 'zh-CN,zh;q=0.9,en;q=0.8' : 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     const xml = response.data;
-    const items: any[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-    let match;
-    
-    while ((match = itemRegex.exec(xml)) !== null && items.length < 30) {
-      const content = match[1];
-      const title = content.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "";
-      const link = content.match(/<link>([\s\S]*?)<\/link>/)?.[1] || "";
-      const pubDateStr = content.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || "";
-      const source = content.match(/<source[\s\S]*?>([\s\S]*?)<\/source>/)?.[1] || "";
-      
-      const pubDate = new Date(pubDateStr);
+    const items = parseRssXml(xml, lang);
+    if (items.length > 0) {
+      console.log(`[Google Direct] Successfully fetched ${items.length} items for ${keyword} (${lang})`);
+      return items;
+    }
+  } catch (error: any) {
+    console.warn(`[Google Direct] Failed for ${keyword} (${lang}): ${error.message || error}. Trying Google News RSS via rss2json...`);
+  }
+
+  // 2. Try Google News RSS via rss2json converter proxy to bypass Google News 503 limits on cloud hosts
+  try {
+    const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(googleUrl)}`;
+    const response = await axios.get(rss2jsonUrl, { timeout: 10000 });
+    if (response.data && response.data.status === 'ok' && Array.isArray(response.data.items)) {
+      const items: any[] = [];
       const now = new Date();
-      const isRecent = !isNaN(pubDate.getTime()) && (now.getTime() - pubDate.getTime()) < 50 * 60 * 60 * 1000;
+      for (const item of response.data.items) {
+        let title = item.title || "";
+        let link = item.link || "";
+        let pubDateStr = item.pubDate || "";
+        let source = item.author || "";
+        
+        if (!source) {
+          const titleParts = title.split(/\s+[-|]\s+/);
+          if (titleParts.length > 1) {
+            source = titleParts.pop() || "";
+            title = titleParts.join(" - ");
+          } else {
+            try {
+              const urlObj = new URL(link);
+              source = urlObj.hostname.replace('www.', '');
+            } catch (e) {
+              source = "Google News";
+            }
+          }
+        }
+
+        const pubDate = new Date(pubDateStr);
+        const isRecent = !isNaN(pubDate.getTime()) && (now.getTime() - pubDate.getTime()) < 50 * 60 * 60 * 1000;
+        
+        if (isRecent && items.length < 15) {
+          items.push({
+            title,
+            link,
+            pubDate: pubDateStr,
+            timestamp: pubDate.getTime(),
+            source: source.trim(),
+            lang
+          });
+        }
+      }
       
-      if (isRecent && items.length < 15) {
-        items.push({ title, link, pubDate: pubDateStr, source, lang });
+      if (items.length > 0) {
+        console.log(`[Google rss2json] Successfully fetched ${items.length} items for ${keyword} (${lang})`);
+        return items;
       }
     }
-    return items;
-  } catch (error) {
-    console.error(`Error fetching ${lang} news for ${keyword}:`, error);
-    return [];
+  } catch (error: any) {
+    console.warn(`[Google rss2json] Failed for ${keyword} (${lang}): ${error.message || error}. Trying Yahoo News RSS fallback...`);
   }
+
+  // 3. Fallback to Yahoo News Search RSS to bypass Google News 503 limits
+  try {
+    const yahooUrl = `https://news.search.yahoo.com/rss?p=${encodedKeyword}`;
+    const response = await axios.get(yahooUrl, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': lang === 'zh' ? 'zh-CN,zh;q=0.9,en;q=0.8' : 'en-US,en;q=0.9'
+      }
+    });
+    const xml = response.data;
+    const items = parseRssXml(xml, lang);
+    console.log(`[Yahoo Fallback] Successfully fetched ${items.length} items from Yahoo News RSS fallback for ${keyword} (${lang})`);
+    return items;
+  } catch (yahooError: any) {
+    console.error(`[Yahoo Fallback] Failed for ${keyword} (${lang}):`, yahooError.message || yahooError);
+  }
+
+  return [];
 }
 
 async function generateContent(newsList: any[]) {
@@ -104,6 +222,7 @@ ${newsList.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '�
       const openai = new OpenAI({
         apiKey: process.env.DOUBAO_API_KEY.trim(),
         baseURL: process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3",
+        timeout: 120000 // Increase default timeout to 120 seconds to prevent API Connection timeouts
       });
 
       const response = await openai.chat.completions.create({
@@ -177,10 +296,27 @@ async function run() {
   }
 
   const uniqueNews = Array.from(new Map(allNews.map(item => [item.title, item])).values());
-  console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN).`);
   
-  const aiContent = await generateContent(uniqueNews);
+  // Sort by timestamp descending (newest first) to prioritize freshest news
+  uniqueNews.sort((a, b) => {
+    const tA = a.timestamp || 0;
+    const tB = b.timestamp || 0;
+    return tB - tA;
+  });
+  
+  // Limit to top 50 items to keep prompt size optimized and prevent LLM timeouts
+  const topNews = uniqueNews.slice(0, 50);
+  console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN). Sending top ${topNews.length} sorted by date to AI.`);
+  
+  const aiContent = await generateContent(topNews);
   await sendToDingTalk(aiContent);
+  
+  // If the AI call failed, throw an error at the end so the GitHub Action is marked as failed,
+  // while still ensuring the notification was sent to DingTalk first.
+  if (aiContent.startsWith("AI 内容生成失败")) {
+    throw new Error(aiContent);
+  }
+  
   console.log("Task completed successfully.");
 }
 
