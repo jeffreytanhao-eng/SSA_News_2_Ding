@@ -226,24 +226,20 @@ ${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文
 
   try {
     if (provider === "doubao" && process.env.DOUBAO_API_KEY) {
-      let customEndpoint = (process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3").trim();
+      const rawEndpoint = process.env.DOUBAO_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3";
       
-      // Sanitizing base URL from any trailing chat/completions suffixes which are a very common user configuration error
-      const suffixes = ["/chat/completions", "/chat/completions/", "/chat", "/chat/", "/v3", "/v3/"];
-      for (const suffix of suffixes) {
-        if (customEndpoint.endsWith(suffix)) {
-          customEndpoint = customEndpoint.substring(0, customEndpoint.length - suffix.length);
-        }
-      }
-      if (customEndpoint.endsWith("/")) {
-        customEndpoint = customEndpoint.slice(0, -1);
-      }
-      // Re-append the clean /api/v3 version if we stripped it but it's Volcengine
-      if (customEndpoint.includes("volces.com") || customEndpoint.includes("volcengineapi.com")) {
-        if (!customEndpoint.endsWith("/api/v3")) {
-          customEndpoint = customEndpoint + "/api/v3";
-        }
-      }
+      // Clean and normalize Endpoint URL to prevent double '/api/api/v3' or erroneous suffixes
+      const sanitizeEndpoint = (urlStr: string) => {
+        let ep = urlStr.trim();
+        ep = ep.replace(/\/chat(\/completions)?\/?$/i, "").replace(/\/+$/, "");
+        if (ep.endsWith("/api/v3")) return ep;
+        if (ep.endsWith("/api")) return ep + "/v3";
+        if (ep.endsWith("/v3")) return ep.replace(/\/v3$/, "/api/v3");
+        if (ep.includes("volces.com") || ep.includes("volcengineapi.com")) return ep + "/api/v3";
+        return ep;
+      };
+
+      const customEndpoint = sanitizeEndpoint(rawEndpoint);
 
       console.log(`[Doubao Config] Base Endpoint URL resolved to: ${customEndpoint}`);
 
