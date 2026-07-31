@@ -236,8 +236,8 @@ ${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文
       // We define potential endpoints to attempt sequentially for bypassing localized block/throttle issues in Github Actions (US/EU runners)
       const endpointOptions = [
         customEndpoint,
-        "https://ark.volcengineapi.com/api/v3", // Volcengine's Global accelerated endpoint (best for GitHub actions / Cloud hosts!)
-        "https://ark.cn-beijing.volces.com/api/v3" // Mainland domestic endpoint
+        "https://ark.cn-beijing.volces.com/api/v3", // Mainland domestic endpoint
+        "https://ark.ap-southeast-1.volces.com/api/v3" // Volcengine's AP-Southeast (Singapore) endpoint for international cloud hosts / GitHub Actions
       ];
 
       // Remove duplicate endpoints while preserving priority order
@@ -299,7 +299,7 @@ ${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文
         try {
           const defaultPrompt = buildPrompt(newsList.slice(0, 15), 6);
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY.trim() });
-          const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
+          const modelName = process.env.LLM_MODEL || "gemini-2.5-flash";
           const result = await ai.models.generateContent({
             model: modelName,
             contents: [{ parts: [{ text: defaultPrompt }] }],
@@ -318,7 +318,7 @@ ${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文
       // Fallback to Gemini if configured, or if Doubao is disabled
       const defaultPrompt = buildPrompt(newsList.slice(0, 20), 8);
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-      const modelName = process.env.LLM_MODEL || "gemini-3-flash-preview";
+      const modelName = process.env.LLM_MODEL || "gemini-2.5-flash";
       console.log(`[Gemini LLM] Attempting content generation with model: ${modelName}`);
       const result = await ai.models.generateContent({
         model: modelName,
