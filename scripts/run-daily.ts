@@ -316,7 +316,8 @@ ${list.map((n, i) => `[ID: ${i}] [语言: ${n.lang === 'en' ? '英文' : '中文
       throw lastError || new Error("Failed to generate content after all attempts and endpoints");
     } else {
       // Fallback to Gemini if configured, or if Doubao is disabled
-      const defaultPrompt = buildPrompt(newsList.slice(0, 20), 8);
+      // Feed 25 candidates and ask the AI to output up to 15 (ensuring >= 12 in practice).
+      const defaultPrompt = buildPrompt(newsList.slice(0, 25), 15);
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
       const modelName = process.env.LLM_MODEL || "gemini-2.5-flash";
       console.log(`[Gemini LLM] Attempting content generation with model: ${modelName}`);
