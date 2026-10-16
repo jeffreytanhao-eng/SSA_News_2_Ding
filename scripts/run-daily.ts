@@ -394,7 +394,8 @@ async function run() {
   // Limit to top 30 items to keep prompt size optimized and prevent LLM timeouts
   const topNews = uniqueNews.slice(0, 30);
   console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN). Sending top ${topNews.length} sorted by date to AI.`);
-  
+
+  await pushToSSA(topNews, date);
   const aiContent = await generateContent(topNews);
   await sendToDingTalk(aiContent);
   
@@ -405,6 +406,33 @@ async function run() {
   }
   
   console.log("Task completed successfully.");
+}
+
+// 新增：推送结构化条目到 SSA 主系统（未配置则跳过，失败不阻断原钉钉推送）
+async function pushToSSA(topNews: NewsItem[], date: string): Promise<void> {
+  const url = process.env.SSA_INGEST_URL;    // http://39.96.81.164:8080/api/v1/ingest/sitrep
+  const token = process.env.SSA_INGEST_TOKEN;
+  if (!url || !token || topNews.length === 0) return;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Ingest-Token": token },
+      body: JSON.stringify({
+        source: "ssa_news_2_ding",
+        items: topNews.map((n) => ({
+          title: n.title,
+          url: n.link,
+          content: n.title,          // RSS 条目无正文，以标题作摘要
+          published_at: n.pubDate,
+          raw: { source: n.source, lang: n.lang, batch_date: date },
+        })),
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    console.log(`[SSA ingest] pushed ${topNews.length} items`);
+  } catch (e) {
+    console.error("[SSA ingest] failed (ignored):", e);
+  }
 }
 
 run().catch(err => {
