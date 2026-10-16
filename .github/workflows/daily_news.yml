@@ -27,5 +27,7 @@ jobs:
           DOUBAO_MODEL: ${{ secrets.DOUBAO_MODEL }}
           USER_CONTEXT: ${{ secrets.USER_CONTEXT }}
           FOCUS_MEDIA: ${{ secrets.FOCUS_MEDIA }}
+          SSA_INGEST_URL: ${{ secrets.SSA_INGEST_URL }}
+          SSA_INGEST_TOKEN: ${{ secrets.SSA_INGEST_TOKEN }}
         run: |
           npx tsx scripts/run-daily.ts
