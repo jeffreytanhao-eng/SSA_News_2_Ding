@@ -395,7 +395,7 @@ async function run() {
   const topNews = uniqueNews.slice(0, 30);
   console.log(`Fetched ${uniqueNews.length} unique news items (CN + EN). Sending top ${topNews.length} sorted by date to AI.`);
 
-  await pushToSSA(topNews, date);
+  await pushToSSA(topNews, new Date().toISOString().slice(0, 10));
   const aiContent = await generateContent(topNews);
   await sendToDingTalk(aiContent);
   
@@ -409,7 +409,7 @@ async function run() {
 }
 
 // 新增：推送结构化条目到 SSA 主系统（未配置则跳过，失败不阻断原钉钉推送）
-async function pushToSSA(topNews: NewsItem[], date: string): Promise<void> {
+async function pushToSSA(topNews: any[], date: string): Promise<void> {
   const url = process.env.SSA_INGEST_URL;    // http://39.96.81.164:8080/api/v1/ingest/sitrep
   const token = process.env.SSA_INGEST_TOKEN;
   if (!url || !token || topNews.length === 0) return;
