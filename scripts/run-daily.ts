@@ -423,7 +423,9 @@ async function pushToSSA(topNews: any[], date: string): Promise<void> {
           title: n.title,
           url: n.link,
           content: n.title,          // RSS 条目无正文，以标题作摘要
-          published_at: n.pubDate,
+          // SSA 主系统为 Pydantic v2 datetime，仅接受 ISO 8601/RFC 3339；
+          // RSS 原始 pubDate 是 RFC 822（"Mon, 19 Oct 2026 ..."）会 422 整批失败
+          published_at: new Date(n.timestamp ?? n.pubDate).toISOString(),
           raw: { source: n.source, lang: n.lang, batch_date: date },
         })),
       }),
